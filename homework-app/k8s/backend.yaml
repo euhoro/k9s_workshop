@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework-backend
+  namespace: homework-todo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: homework-backend
+  template:
+    metadata:
+      labels:
+        app: homework-backend
+    spec:
+      containers:
+        - name: homework-backend
+          image: homework-todo-backend:1.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: DB_HOST
+              value: homework-postgres
+            - name: API_PREFIX
+              value: /api
+          envFrom:
+            - secretRef:
+                name: homework-postgres-credentials
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homework-backend
+  namespace: homework-todo
+spec:
+  type: ClusterIP
+  selector:
+    app: homework-backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kubernetes Todo List</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Running on Kubernetes</p>
+      <h1>Todo list</h1>
+      <form id="todo-form">
+        <input id="todo-text" required maxlength="255" placeholder="What needs doing?">
+        <button>Add</button>
+      </form>
+      <p id="message" role="status"></p>
+      <ul id="todos"></ul>
+    </main>
+    <script src="/config.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
