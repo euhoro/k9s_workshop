@@ -1,8 +1,9 @@
 # Homework 3: ClusterIP, NodePort, LoadBalancer, and Ingress
 
-This lab deploys one Nginx server with two replicas, then exposes the same Pods
-four different ways. Follow the parts in order because all three Service files
-modify the same Service named `homework3-server`.
+This lab deploys a complete three-tier todo application: an Nginx frontend, a
+Node.js backend, and PostgreSQL. It then exposes the two frontend Pods four
+different ways. Follow the parts in order because all three Service files
+modify the same frontend Service named `homework3-server`.
 
 Read [EXPLANATION.md](EXPLANATION.md) for diagrams and the reasoning behind each
 networking type.
@@ -27,17 +28,39 @@ networking type.
 - **What else can Ingress provide?** Central TLS termination, redirects, and
   controller-dependent authentication, rate limits, rewrites, retries, and
   header policies.
+- **Why are the backend and database always ClusterIP?** Only the frontend
+  Service is changed during Parts 1–3. The browser reaches the backend through
+  the final Ingress `/api` rule, and only the backend needs direct database
+  access. Neither internal layer needs its own NodePort or LoadBalancer.
 
-## Deploy the server
+## Build the backend image
+
+Homework 3 reuses the tested Node.js backend source from Homework 1:
+
+```bash
+docker build -t homework-todo-backend:1.1 homework-app/backend
+k3d image import homework-todo-backend:1.1 -c k3s-default
+```
+
+## Deploy the three application layers
 
 From the repository root:
 
 ```bash
 kubectl apply -f homework-3-networking/k8s/namespace.yaml
+kubectl apply -f homework-3-networking/k8s/backend-database.yaml
 kubectl apply -f homework-3-networking/k8s/deployment.yaml
+kubectl rollout status deployment/homework3-postgres -n homework3-networking
+kubectl rollout status deployment/homework3-backend -n homework3-networking
 kubectl rollout status deployment/homework3-server -n homework3-networking
-kubectl get pods -n homework3-networking -o wide
+kubectl get pods,service,pvc -n homework3-networking -o wide
 ```
+
+The layers are:
+
+- `homework3-server`: two Nginx frontend Pods;
+- `homework3-backend`: two Node.js CRUD API Pods;
+- `homework3-postgres`: one PostgreSQL Pod with a 1 GiB PVC.
 
 ## Part 1: ClusterIP
 
@@ -106,6 +129,18 @@ routing without changing DNS:
 
 ```bash
 curl --fail -H 'Host: homework3.local' http://localhost:8000/
+```
+
+Test the backend path through the same Ingress:
+
+```bash
+curl --fail -H 'Host: homework3.local' \
+  http://localhost:8000/api/todos
+
+curl --fail -H 'Host: homework3.local' \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Understand Kubernetes networking"}' \
+  http://localhost:8000/api/todos
 ```
 
 For browser access, add this local hosts entry (requires administrator access):

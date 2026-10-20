@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: homework3-postgres-credentials
+  namespace: homework3-networking
+type: Opaque
+stringData:
+  POSTGRES_DB: homework3
+  POSTGRES_USER: homework3_user
+  POSTGRES_PASSWORD: local-homework3-password
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homework3-postgres-data
+  namespace: homework3-networking
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework3-postgres
+  namespace: homework3-networking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homework3-postgres
+  template:
+    metadata:
+      labels:
+        app: homework3-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: homework3-postgres-credentials
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: homework3-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homework3-postgres
+  namespace: homework3-networking
+spec:
+  type: ClusterIP
+  selector:
+    app: homework3-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework3-backend
+  namespace: homework3-networking
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: homework3-backend
+  template:
+    metadata:
+      labels:
+        app: homework3-backend
+    spec:
+      containers:
+        - name: backend
+          image: homework-todo-backend:1.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: DB_HOST
+              value: homework3-postgres
+            - name: API_PREFIX
+              value: /api
+          envFrom:
+            - secretRef:
+                name: homework3-postgres-credentials
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homework3-backend
+  namespace: homework3-networking
+spec:
+  type: ClusterIP
+  selector:
+    app: homework3-backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

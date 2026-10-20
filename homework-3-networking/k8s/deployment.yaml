@@ -7,10 +7,77 @@ data:
   index.html: |
     <!doctype html>
     <html>
-      <head><title>Homework 3</title></head>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Homework 3</title>
+        <style>
+          body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 4rem auto; padding: 0 1rem; }
+          form { display: flex; gap: .5rem; }
+          input { flex: 1; padding: .7rem; }
+          button { padding: .7rem 1rem; cursor: pointer; }
+          li { margin: .7rem 0; }
+          .done { text-decoration: line-through; color: #777; }
+          #status { color: #b91c1c; }
+        </style>
+      </head>
       <body>
         <h1>Homework 3: Kubernetes networking</h1>
-        <p>This response came from the Nginx Deployment.</p>
+        <p>Nginx frontend → Node.js backend → PostgreSQL database</p>
+        <form id="form">
+          <input id="text" required maxlength="255" placeholder="Add a todo">
+          <button>Add</button>
+        </form>
+        <p id="status"></p>
+        <ul id="todos"></ul>
+        <script>
+          const list = document.querySelector('#todos');
+          const status = document.querySelector('#status');
+          const input = document.querySelector('#text');
+
+          async function api(path, options = {}) {
+            const response = await fetch(`/api${path}`, {
+              headers: { 'Content-Type': 'application/json' },
+              ...options
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.status === 204 ? null : response.json();
+          }
+
+          async function load() {
+            try {
+              const todos = await api('/todos');
+              list.replaceChildren(...todos.map(todo => {
+                const item = document.createElement('li');
+                item.className = todo.completed ? 'done' : '';
+                item.textContent = todo.text + ' ';
+                const toggle = document.createElement('button');
+                toggle.textContent = todo.completed ? 'Undo' : 'Done';
+                toggle.onclick = async () => {
+                  await api(`/todos/${todo.id}`, { method: 'PATCH' });
+                  await load();
+                };
+                item.append(toggle);
+                return item;
+              }));
+              status.textContent = '';
+            } catch (error) {
+              status.textContent = `Backend unavailable: ${error.message}`;
+            }
+          }
+
+          document.querySelector('#form').onsubmit = async event => {
+            event.preventDefault();
+            await api('/todos', {
+              method: 'POST',
+              body: JSON.stringify({ text: input.value })
+            });
+            input.value = '';
+            await load();
+          };
+
+          load();
+        </script>
       </body>
     </html>
 ---
@@ -26,6 +93,8 @@ spec:
       app: homework3-server
   template:
     metadata:
+      annotations:
+        homework3/content-version: "2"
       labels:
         app: homework3-server
     spec:

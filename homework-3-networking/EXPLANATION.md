@@ -1,6 +1,44 @@
 # Understanding Kubernetes network exposure
 
-## The unchanged foundation
+## The application stack
+
+Homework 3 now uses three layers:
+
+```text
+Browser
+  |
+  v
+Traefik Ingress
+  |
+  +-- / ----------------> homework3-server Service
+  |                              |
+  |                              +--> Nginx frontend Pod 1
+  |                              +--> Nginx frontend Pod 2
+  |
+  +-- /api -------------> homework3-backend Service
+                                 |
+                                 +--> Node.js backend Pod 1
+                                 +--> Node.js backend Pod 2
+                                            |
+                                            v
+                                  homework3-postgres Service
+                                            |
+                                            v
+                                      PostgreSQL Pod
+                                            |
+                                            v
+                                           PVC
+```
+
+The Nginx frontend serves HTML and browser JavaScript. That JavaScript makes
+CRUD requests to relative URLs under `/api`. The Node.js backend validates HTTP
+requests and performs SQL queries. PostgreSQL persists todos on a PVC. Database
+credentials come from one Secret referenced by PostgreSQL and the backend.
+
+Before these layers were added, Homework 3 served only fixed HTML. Static HTML
+does not need an API or database because it stores no application data.
+
+## The networking experiment's unchanged foundation
 
 The Deployment always runs two replaceable Nginx Pods:
 
@@ -14,14 +52,15 @@ ReplicaSet
        +--> Pod B: app=homework3-server, changing IP
 ```
 
-Every Service variant selects both Pods using:
+Every frontend Service variant selects both Nginx Pods using:
 
 ```yaml
 selector:
   app: homework3-server
 ```
 
-Only the way clients reach that Service changes.
+Only the way clients reach that frontend Service changes. The backend and
+PostgreSQL Services remain ClusterIP throughout the experiment.
 
 ## Part 1: ClusterIP
 
@@ -134,6 +173,16 @@ The Ingress object is only configuration. Traefik is the Ingress controller
 that reads it and actually proxies traffic. The controller itself needs an
 external entry point, commonly one LoadBalancer Service. Application Services
 behind it can remain ClusterIP.
+
+In the final manifest, host `homework3.local` has two path rules:
+
+```text
+/api/* -> homework3-backend:3000
+/*     -> homework3-server:8088
+```
+
+The `/api` rule is more specific, so API traffic reaches Node.js while all other
+paths reach Nginx. PostgreSQL has no Ingress rule at all.
 
 ## Why not one LoadBalancer per application?
 
