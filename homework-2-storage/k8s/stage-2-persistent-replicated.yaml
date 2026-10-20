@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: homework2-redis-headless
+  namespace: homework2-storage
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: homework2-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: homework2-redis
+  namespace: homework2-storage
+spec:
+  serviceName: homework2-redis-headless
+  replicas: 2
+  selector:
+    matchLabels:
+      app: homework2-redis
+  template:
+    metadata:
+      labels:
+        app: homework2-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          command: ["sh", "-c"]
+          args:
+            - |
+              if [ "$(hostname)" = "homework2-redis-0" ]; then
+                exec redis-server --appendonly yes
+              else
+                exec redis-server --appendonly yes \
+                  --replicaof homework2-redis-0.homework2-redis-headless 6379
+              fi
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
