@@ -6,6 +6,23 @@ instances that share logical data through replication.
 
 Read [EXPLANATION.md](EXPLANATION.md) before or alongside the commands.
 
+## Assignment answers
+
+- **Why is data lost in stage 1?** The key exists only in the deleted
+  container's writable filesystem; a replacement Pod starts with a new one.
+- **How do Volume, PV, and PVC solve it?** The container mounts `/data` from a
+  volume backed by a PVC. k3d's StorageClass dynamically creates a PV, whose
+  lifecycle is separate from the Pod.
+- **Why does a StatefulSet help?** Each stable Pod ordinal is associated with a
+  stable claim, so replacement Pod `homework2-redis-0` reuses PVC
+  `data-homework2-redis-0`.
+- **How is data shared with two database instances?** Redis copies logical data
+  from the primary to the replica using its replication protocol. Each instance
+  has its own PVC; they do not concurrently modify one raw data directory.
+- **Is this production high availability?** No. The lab has no automatic primary
+  election or failover; production Redis normally uses Sentinel, Redis Cluster,
+  or an operator.
+
 ## Prerequisites
 
 - A running Kubernetes or k3d cluster

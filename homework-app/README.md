@@ -14,6 +14,25 @@ guide, architecture, traffic flow, selectors, storage, Secrets, and probes.
 - Persistent data: 1 GiB PVC
 - Shared credentials: Kubernetes Secret
 
+## Assignment answers
+
+- **How is the frontend exposed?** Traefik Ingress routes `/` to the internal
+  `homework-frontend` ClusterIP Service.
+- **How does the frontend reach the backend?** Browser JavaScript requests the
+  same origin under `/api`; Ingress routes that prefix to `homework-backend`.
+- **Why do they share one DNS/IP?** One Ingress accepts both paths and makes a
+  Layer-7 routing decision instead of allocating one external address per app.
+- **Why is PostgreSQL not externally accessible?** It has only a ClusterIP
+  Service and no Ingress, NodePort, or LoadBalancer route.
+- **How does the backend reach PostgreSQL?** It uses the stable Service DNS name
+  `homework-postgres` and credentials injected from the shared Secret.
+- **Why does data survive PostgreSQL Pod replacement?** `/var/lib/postgresql/data`
+  is mounted from a PVC bound to storage whose lifecycle is separate from the
+  Pod.
+- **Why is the committed Secret only a demonstration?** Its password is visible
+  in Git; base64 Kubernetes Secret storage is encoding, not encryption. See
+  `EXPLANATION.md` for External Secrets, SOPS, Sealed Secrets, and CI/CD options.
+
 ## Deploy it yourself
 
 From the repository root:

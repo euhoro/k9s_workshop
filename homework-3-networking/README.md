@@ -7,6 +7,27 @@ modify the same Service named `homework3-server`.
 Read [EXPLANATION.md](EXPLANATION.md) for diagrams and the reasoning behind each
 networking type.
 
+## Assignment answers
+
+- **Why ClusterIP?** It gives the selected Pods a stable virtual IP and DNS name
+  reachable by other cluster workloads without opening an external port.
+- **How is NodePort different?** It retains internal Service networking and also
+  opens one high port on every node. It is rarely the final public interface
+  because clients must manage node addresses/ports and it provides no HTTP
+  routing or TLS management. It remains useful for labs, debugging, bare metal,
+  or as a building block beneath another load balancer.
+- **How is LoadBalancer different?** It asks the platform to provide an external
+  address/load balancer. Local k3s uses ServiceLB helper Pods and Docker-node
+  addresses; a managed cloud provisions a real provider load balancer, network
+  rules, and a public or private address, normally with additional cost.
+- **Why add Ingress if a load balancer already accepts traffic?** A basic load
+  balancer usually forwards at Layer 4 using IP and port. Ingress understands
+  Layer-7 HTTP hostnames and paths, so many applications can share one external
+  entry point.
+- **What else can Ingress provide?** Central TLS termination, redirects, and
+  controller-dependent authentication, rate limits, rewrites, retries, and
+  header policies.
+
 ## Deploy the server
 
 From the repository root:
