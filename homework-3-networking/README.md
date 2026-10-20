@@ -8,6 +8,35 @@ modify the same frontend Service named `homework3-server`.
 Read [EXPLANATION.md](EXPLANATION.md) for diagrams and the reasoning behind each
 networking type.
 
+## Why this homework uses Kustomize
+
+`kubectl` includes Kustomize, which assembles several Kubernetes YAML files into
+one declared application. The `k8s/kustomization.yaml` file lists the resources
+that make up Homework 3's final recommended state:
+
+```text
+namespace
++ PostgreSQL, Secret, and PVC
++ backend
++ frontend
++ frontend ClusterIP Service
++ Ingress
+= final application
+```
+
+Deploy or update that complete final state with one idempotent command:
+
+```bash
+kubectl apply -k homework-3-networking/k8s
+```
+
+Kustomize renders ordinary Kubernetes objects before sending them to the API;
+it is not another process running in the cluster. It reduces forgotten files,
+keeps the deploy command reproducible, and can also support environment overlays
+without copying whole manifests. The NodePort and LoadBalancer YAML files are
+deliberately not in `kustomization.yaml`: they temporarily replace the frontend
+Service during Parts 2 and 3 rather than belonging to the final state.
+
 ## Assignment answers
 
 - **Why ClusterIP?** It gives the selected Pods a stable virtual IP and DNS name
@@ -61,6 +90,34 @@ The layers are:
 - `homework3-server`: two Nginx frontend Pods;
 - `homework3-backend`: two Node.js CRUD API Pods;
 - `homework3-postgres`: one PostgreSQL Pod with a 1 GiB PVC.
+
+After learning the individual files, the equivalent one-command deployment is:
+
+```bash
+kubectl apply -k homework-3-networking/k8s
+```
+
+## Secret handling: lab versus production
+
+The backend and PostgreSQL both reference `homework3-postgres-credentials`.
+This keeps credentials out of the Deployment specifications and ensures both
+components receive the same database name, username, and password.
+
+For this reproducible local lab, the example password is committed under
+`stringData` in `backend-database.yaml`. That is **not production-safe**. The
+Kubernetes API normally displays Secret data as base64, but base64 is reversible
+encoding rather than encryption. Anyone who can read the repository—or has
+sufficient Kubernetes RBAC access—can obtain the password.
+
+Common production approaches are:
+
+- store credentials in AWS Secrets Manager, Azure Key Vault, Google Secret
+  Manager, or HashiCorp Vault and synchronize them with External Secrets;
+- commit only encrypted values using SOPS or Sealed Secrets;
+- inject a Secret from protected CI/CD variables during deployment.
+
+Production clusters should also enable Secret encryption at rest, use
+least-privilege RBAC, rotate credentials, and avoid printing secrets in logs.
 
 ## How a request travels through the application
 

@@ -35,6 +35,18 @@ CRUD requests to relative URLs under `/api`. The Node.js backend validates HTTP
 requests and performs SQL queries. PostgreSQL persists todos on a PVC. Database
 credentials come from one Secret referenced by PostgreSQL and the backend.
 
+The final set is listed in `k8s/kustomization.yaml`, allowing `kubectl apply -k`
+to render and apply all final-state resources together. Kustomize runs on the
+client side; it does not install an in-cluster component. The temporary
+NodePort and LoadBalancer variants are excluded because only one Service type
+should describe the final frontend Service at a time.
+
+The committed Secret value is for local learning only. Base64 is not
+encryption. Production systems normally source credentials from an external
+secret manager, encrypted Git manifests such as SOPS/Sealed Secrets, or
+protected CI/CD variables, together with encryption at rest, narrow RBAC, and
+regular rotation.
+
 Before these layers were added, Homework 3 served only fixed HTML. Static HTML
 does not need an API or database because it stores no application data.
 
