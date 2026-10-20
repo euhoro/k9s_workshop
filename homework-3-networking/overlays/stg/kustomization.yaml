@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../k8s
+namespace: homework3-stg
+labels:
+  - pairs:
+      environment: stg
+replicas:
+  - name: homework3-server
+    count: 2
+  - name: homework3-backend
+    count: 3
+  - name: homework3-postgres
+    count: 1
+patches:
+  - target:
+      kind: Namespace
+      name: homework3-networking
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: homework3-stg
+  - target:
+      kind: Ingress
+      name: homework3-server
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: homework3.stg.local

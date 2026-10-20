@@ -37,6 +37,82 @@ without copying whole manifests. The NodePort and LoadBalancer YAML files are
 deliberately not in `kustomization.yaml`: they temporarily replace the frontend
 Service during Parts 2 and 3 rather than belonging to the final state.
 
+## Different configuration for dev and staging
+
+The `k8s/` directory is the shared **base**. Environment overlays import that
+base and declare only their differences:
+
+```text
+homework-3-networking/
+├── k8s/                    shared final-state resources
+│   └── kustomization.yaml
+└── overlays/
+    ├── dev/
+    │   └── kustomization.yaml
+    └── stg/
+        └── kustomization.yaml
+```
+
+The included examples render these settings:
+
+| Setting | Dev | Staging |
+|---|---|---|
+| Namespace | `homework3-dev` | `homework3-stg` |
+| Ingress host | `homework3.dev.local` | `homework3.stg.local` |
+| Frontend replicas | 1 | 2 |
+| Backend replicas | 1 | 3 |
+| PostgreSQL replicas | 1 | 1 |
+| Environment label | `environment=dev` | `environment=stg` |
+
+Preview the fully rendered YAML without changing the cluster:
+
+```bash
+kubectl kustomize homework-3-networking/overlays/dev
+kubectl kustomize homework-3-networking/overlays/stg
+```
+
+Deploy one environment:
+
+```bash
+kubectl apply -k homework-3-networking/overlays/dev
+# or
+kubectl apply -k homework-3-networking/overlays/stg
+```
+
+Because the namespaces and hostnames differ, dev and staging can run together
+without their namespaced Deployments, Services, PVCs, or Secrets colliding.
+For local browser access, add the chosen hostname to `/etc/hosts`:
+
+```text
+127.0.0.1 homework3.dev.local
+127.0.0.1 homework3.stg.local
+```
+
+Remove only one environment with:
+
+```bash
+kubectl delete -k homework-3-networking/overlays/dev
+# or
+kubectl delete -k homework-3-networking/overlays/stg
+```
+
+### Environment-specific secrets
+
+The learning overlays currently inherit the committed demo Secret so they stay
+self-contained. Real dev and staging environments must not store plaintext
+password patches in Git. Instead, give each environment a separate external
+secret-manager path, for example:
+
+```text
+/k9s-workshop/dev/postgres  -> Secret in homework3-dev
+/k9s-workshop/stg/postgres  -> Secret in homework3-stg
+```
+
+External Secrets, SOPS/Sealed Secrets, or CI/CD should create the same Secret
+name (`homework3-postgres-credentials`) in each namespace with different values.
+The Deployments remain unchanged because they depend on the Secret's name and
+keys, not on where the values came from.
+
 ## Assignment answers
 
 - **Why ClusterIP?** It gives the selected Pods a stable virtual IP and DNS name

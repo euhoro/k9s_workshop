@@ -47,6 +47,12 @@ secret manager, encrypted Git manifests such as SOPS/Sealed Secrets, or
 protected CI/CD variables, together with encryption at rest, narrow RBAC, and
 regular rotation.
 
+The `overlays/dev` and `overlays/stg` directories demonstrate environment
+configuration without duplicating the base. Kustomize renders the same objects
+with different namespaces, hostnames, replica counts, and environment labels.
+Each environment can therefore evolve through a small reviewable patch while
+structural application changes remain centralized in `k8s/`.
+
 Before these layers were added, Homework 3 served only fixed HTML. Static HTML
 does not need an API or database because it stores no application data.
 
