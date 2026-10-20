@@ -62,6 +62,120 @@ The layers are:
 - `homework3-backend`: two Node.js CRUD API Pods;
 - `homework3-postgres`: one PostgreSQL Pod with a 1 GiB PVC.
 
+## How a request travels through the application
+
+There are two related but different request paths: loading the UI and using the
+API. The UI is JavaScript running in the user's browser after Nginx sends it.
+
+### 1. Loading the UI
+
+```text
+Browser requests http://homework3.local:8000/
+  |
+  v
+k3d load balancer maps host port 8000 to cluster port 80
+  |
+  v
+Traefik receives HTTP Host=homework3.local and Path=/
+  |
+  | Ingress rule: / -> homework3-server:8088
+  v
+homework3-server ClusterIP Service
+  |
+  | selector app=homework3-server chooses a ready endpoint
+  v
+one Nginx frontend Pod on container port 80
+  |
+  v
+HTML and JavaScript return to the browser
+```
+
+The Service stays stable while its two frontend Pod names and IP addresses can
+change. Kubernetes maintains the Service's EndpointSlices from matching labels.
+
+### 2. Reading todos after the page loads
+
+The downloaded JavaScript calls `fetch('/api/todos')`:
+
+```text
+JavaScript in browser sends GET /api/todos
+  |
+  v
+k3d load balancer -> Traefik
+  |
+  | Ingress chooses the more specific /api rule
+  v
+homework3-backend ClusterIP Service on port 3000
+  |
+  | selector app=homework3-backend
+  v
+one ready Node.js backend Pod
+  |
+  | SQL: SELECT * FROM todos
+  | DB_HOST=homework3-postgres
+  v
+Kubernetes DNS resolves the homework3-postgres Service
+  |
+  v
+homework3-postgres ClusterIP Service on port 5432
+  |
+  | selector app=homework3-postgres
+  v
+PostgreSQL Pod reads rows from its database files on the PVC
+  |
+  v
+PostgreSQL -> Node.js -> Traefik -> browser JavaScript -> rendered list
+```
+
+Nginx is not in the `/api` request path. Its job was to deliver the UI files;
+the JavaScript running in the browser contacts the same public address directly.
+
+### 3. Creating a todo
+
+When the user submits the form, the route is the same but the operation changes:
+
+```text
+UI form
+  -> JavaScript sends POST /api/todos with JSON
+  -> Traefik routes /api to homework3-backend
+  -> backend validates the text
+  -> backend executes INSERT INTO todos ...
+  -> PostgreSQL updates its files through the mounted PVC
+  -> PostgreSQL returns the new row
+  -> backend returns JSON with HTTP 201
+  -> JavaScript reloads and displays the list
+```
+
+The PVC is not a network hop. It is storage mounted into the PostgreSQL Pod at
+`/var/lib/postgresql/data`. PostgreSQL alone reads and writes those files.
+
+### Complete architecture
+
+```text
+                          one public host/address
+Browser UI              homework3.local:8000
+    |                              |
+    +--------------------------> Traefik
+                                   |
+                 +-----------------+------------------+
+                 | Path /                             | Path /api
+                 v                                    v
+       frontend ClusterIP Service          backend ClusterIP Service
+                 |                                    |
+          +------+------+                      +------+------+
+          |             |                      |             |
+       Nginx 1       Nginx 2                Node.js 1     Node.js 2
+                                                       |
+                                                       v
+                                            PostgreSQL ClusterIP
+                                                       |
+                                                       v
+                                                  PostgreSQL
+                                                       |
+                                                       v
+                                                      PVC
+```
+
 ## Part 1: ClusterIP
 
 ```bash
